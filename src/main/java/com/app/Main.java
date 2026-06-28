@@ -3,25 +3,28 @@ package com.app;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class Main {
     private static final int PORT = 8080;
 
     static void main() {
-        try (ServerSocket serverSocket = new ServerSocket(PORT)) {
-            System.out.println("HTTP server started on PORT: " + PORT + "...");
+        try (ServerSocket serverSocket = new ServerSocket()) {
+            serverSocket.setReuseAddress(true);
+            serverSocket.bind(new java.net.InetSocketAddress(PORT));
 
-            while (true) {
-                try {
-                    Socket socket = serverSocket.accept();
+            System.out.println("HTTP server started on PORT: " + PORT + " using Virtual Threads...");
 
-                    ClientHandler clientHandler = new ClientHandler(socket);
-
-                    Thread thread = new Thread(clientHandler);
-
-                    thread.start();
-                } catch (IOException e) {
-                    System.err.println("Failed to accept connection: " + e.getMessage());
+            try (ExecutorService executorService = Executors.newVirtualThreadPerTaskExecutor()) {
+                while (true) {
+                    try {
+                        Socket socket = serverSocket.accept();
+                        ClientHandler clientHandler = new ClientHandler(socket);
+                        executorService.submit(clientHandler);
+                    } catch (IOException e) {
+                        System.err.println("Failed to accept connection: " + e.getMessage());
+                    }
                 }
             }
         } catch (IOException e) {
