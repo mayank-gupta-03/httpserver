@@ -5,6 +5,11 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.Socket;
+import java.net.URI;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
 
 public class ClientHandler implements Runnable {
     private final Socket clientSocket;
@@ -25,7 +30,9 @@ public class ClientHandler implements Runnable {
 
             String[] zone1Parts = requestLine.split(" ");
             String method = zone1Parts[0];
-            String path = zone1Parts[1];
+            URI uri = URI.create(zone1Parts[1]);
+            String path = uri.getPath();
+            Map<String, String> params = parseQueryString(uri.getRawQuery());
 
             String headerLine;
             while ((headerLine = in.readLine()) != null && !headerLine.isEmpty()) {
@@ -48,6 +55,11 @@ public class ClientHandler implements Runnable {
                     statusLine = "HTTP/1.1 200 OK";
                     htmlBody = "<h1>Contact World!</h1>";
                 }
+                case "/greet" -> {
+                    statusLine = "HTTP/1.1 200 OK";
+                    String name = params.getOrDefault("name", "");
+                    htmlBody = "<h1>Hello " + name + "!</h1>";
+                }
                 default -> {
                     statusLine = "HTTP/1.1 404 Not Found";
                     htmlBody = "<h1>404 Not Found</h1>";
@@ -65,5 +77,29 @@ public class ClientHandler implements Runnable {
         } catch (IOException e) {
             System.err.println("Error handling client: " + e.getMessage());
         }
+    }
+
+    private Map<String, String> parseQueryString(String query) {
+        Map<String, String> params = new HashMap<>();
+
+        if (query == null || query.isBlank()) {
+            return params;
+        }
+
+        String[] pairs = query.split("&");
+
+        for (String pair : pairs) {
+            String[] keyValue = pair.split("=");
+            String key = URLDecoder.decode(keyValue[0], StandardCharsets.UTF_8);
+
+            if (keyValue.length > 1) {
+                String value = URLDecoder.decode(keyValue[1], StandardCharsets.UTF_8);
+                params.put(key, value);
+            } else {
+                params.put(key, "");
+            }
+        }
+
+        return params;
     }
 }
